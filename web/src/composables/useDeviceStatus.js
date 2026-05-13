@@ -1,4 +1,5 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
+import { getAssetsCapabilities, getManagerDeviceId, getManagerToken, isManagerMode, managerRequest } from '@/utils/ManagerApi.js'
 
 // 全局共享的设备状态
 const deviceStatus = ref({
@@ -31,6 +32,18 @@ const getUrlParameter = (name) => {
 const callMcpTool = async (toolName, params = {}) => {
   if (!token.value) {
     throw new Error('Authentication token not found')
+  }
+
+  if (isManagerMode()) {
+    const deviceId = getManagerDeviceId()
+    const result = await managerRequest(`/user/devices/${encodeURIComponent(deviceId)}/mcp-call`, {
+      method: 'POST',
+      body: JSON.stringify({
+        tool_name: toolName,
+        arguments: params
+      })
+    })
+    return result.data?.result || result.data || result
   }
 
   const response = await fetch('/api/messaging/device/tools/call', {
@@ -71,6 +84,30 @@ const callMcpTool = async (toolName, params = {}) => {
 // 获取设备详细信息
 const fetchDeviceInfo = async () => {
   try {
+    if (isManagerMode()) {
+      const capabilities = await getAssetsCapabilities()
+      const assetsPartition = capabilities.assets_partition || {}
+      const display = capabilities.display || {}
+
+      deviceInfo.value.chip = { model: capabilities.chip_model_name || 'Unknown' }
+      deviceInfo.value.board = { model: capabilities.device_name || getUrlParameter('device_label') || 'Unknown' }
+      deviceInfo.value.firmware = { version: 'Unknown' }
+      deviceInfo.value.flash = assetsPartition.size
+        ? { size: `${Math.round(assetsPartition.size / 1024 / 1024)}MB` }
+        : { size: 'Unknown' }
+      deviceInfo.value.assetsPartition = assetsPartition.present
+        ? {
+            size: assetsPartition.size,
+            sizeFormatted: `${Math.round(assetsPartition.size / 1024 / 1024)}MB`
+          }
+        : null
+      deviceInfo.value.network = { type: 'unknown', signal: capabilities.online ? 'strong' : 'Unknown' }
+      deviceInfo.value.screen = display.width || display.height
+        ? { resolution: `${display.width || 0}x${display.height || 0}` }
+        : { resolution: 'Unknown' }
+      return
+    }
+
     // 并发获取所有设备信息
     const [systemInfoResponse, deviceStateResponse, screenInfoResponse] = await Promise.allSettled([
       callMcpTool('self.get_system_info'),
@@ -152,6 +189,15 @@ const checkDeviceStatus = async () => {
 
   isChecking.value = true
   try {
+    if (isManagerMode()) {
+      const capabilities = await getAssetsCapabilities()
+      deviceStatus.value.isOnline = Boolean(capabilities.online)
+      deviceStatus.value.error = capabilities.warnings?.join('; ') || ''
+      deviceStatus.value.lastCheck = new Date()
+      await fetchDeviceInfo()
+      return
+    }
+
     const response = await fetch('/api/messaging/device/tools/list', {
       method: 'POST',
       headers: {
@@ -205,7 +251,7 @@ const getSignalDisplayText = (signal, t) => {
 
 // 初始化设备状态监控
 const initializeDeviceStatus = () => {
-  token.value = getUrlParameter('token')
+  token.value = getManagerToken() || getUrlParameter('token')
   if (token.value) {
     checkDeviceStatus()
   }

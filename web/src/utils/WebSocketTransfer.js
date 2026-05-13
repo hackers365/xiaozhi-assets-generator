@@ -1,6 +1,7 @@
 class WebSocketTransfer {
-  constructor(token) {
-    this.token = token
+  constructor(tokenOrUrl) {
+    this.token = tokenOrUrl
+    this.wsUrl = tokenOrUrl
     this.ws = null
     this.isConnected = false
     this.isCancelled = false
@@ -19,8 +20,9 @@ class WebSocketTransfer {
   async connect() {
     return new Promise((resolve, reject) => {
       try {
-        // 使用固定的transfer服务器地址
-        const wsUrl = `wss://api.tenclass.net/transfer/?token=${encodeURIComponent(this.token)}`
+        const wsUrl = this.wsUrl && /^wss?:\/\//i.test(this.wsUrl)
+          ? this.wsUrl
+          : `wss://api.tenclass.net/transfer/?token=${encodeURIComponent(this.token)}`
         this.ws = new WebSocket(wsUrl)
 
         this.ws.onopen = () => {

@@ -100,6 +100,7 @@ import configStorage from '@/utils/ConfigStorage.js'
 import AssetsBuilder from '@/utils/AssetsBuilder.js'
 import WebSocketTransfer from '@/utils/WebSocketTransfer.js'
 import { useDeviceStatus } from '@/composables/useDeviceStatus.js'
+import { cancelFlashSession, createFlashSession, getAssetsCapabilities, isManagerMode, startFlashSession } from '@/utils/ManagerApi.js'
 
 // 使用共享的设备状态
 const {
@@ -121,6 +122,7 @@ const isLoading = ref(true)
 const assetsBuilder = new AssetsBuilder()
 const autoHideTimer = ref(null) // 新增：自动隐藏定时器
 const webSocketTransfer = ref(null) // WebSocket传输实例
+const currentFlashSessionId = ref('')
 
 // 注意：由于在setup函数外部，我们需要在这里定义一个函数来获取翻译
 // 或者我们可以将这个移到setup函数内部
@@ -237,6 +239,11 @@ const callMcpTool = async (toolName, params = {}) => {
 
 // 处理开始在线烧录
 const handleStartFlash = async (flashData) => {
+  if (isManagerMode()) {
+    await handleManagerStartFlash(flashData)
+    return
+  }
+
   const { blob, onProgress, onComplete, onError } = flashData
 
   try {
@@ -358,8 +365,94 @@ const handleStartFlash = async (flashData) => {
   }
 }
 
+const handleManagerStartFlash = async (flashData) => {
+  const { blob, onProgress, onComplete, onError } = flashData
+
+  try {
+    onProgress(5, t('flashProgress.checkingDeviceStatus'))
+    const capabilities = await getAssetsCapabilities()
+    if (!capabilities.supports_flash) {
+      const warning = capabilities.warnings?.join('; ') || t('flashProgress.unableToGetDeviceStatus')
+      throw new Error(warning)
+    }
+
+    onProgress(15, t('flashProgress.initializingTransferService'))
+    const session = await createFlashSession({
+      fileName: 'assets.bin',
+      fileSize: blob.size,
+      configSummary: {
+        chip: config.value.chip?.model || '',
+        display: config.value.chip?.display || {},
+        wakeword: config.value.theme?.wakeword?.type || 'none',
+        font: config.value.theme?.font?.type || 'none',
+        emoji: config.value.theme?.emoji?.type || 'none'
+      }
+    })
+    currentFlashSessionId.value = session.session_id
+    webSocketTransfer.value = new WebSocketTransfer(session.upload_ws_url)
+
+    let transferStartedResolver = null
+    const transferStartedPromise = new Promise((resolve) => {
+      transferStartedResolver = resolve
+    })
+    webSocketTransfer.value.onTransferStarted = () => {
+      if (transferStartedResolver) {
+        transferStartedResolver()
+        transferStartedResolver = null
+      }
+    }
+
+    await webSocketTransfer.value.initializeSession(
+      blob,
+      (progress, step) => {
+        onProgress(15 + progress * 0.75, step)
+      },
+      (error) => {
+        console.error('WebSocket初始化失败:', error)
+        onError(t('flashProgress.initializeTransferFailed', { error: error.message }))
+      },
+      () => {}
+    )
+
+    onProgress(30, t('flashProgress.settingDeviceDownloadUrl'))
+    await startFlashSession(session.session_id)
+
+    onProgress(50, t('flashProgress.waitingForDeviceReboot'))
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(t('flashProgress.deviceRebootTimeout'))), 60000)
+    })
+    await Promise.race([transferStartedPromise, timeoutPromise])
+
+    onProgress(60, t('flashProgress.startingFileTransfer'))
+    await webSocketTransfer.value.startTransfer(
+      (progress, step) => {
+        const adjustedProgress = 60 + (progress * 0.4)
+        onProgress(Math.round(adjustedProgress), step)
+      },
+      (error) => {
+        onError(t('flashProgress.onlineFlashFailed', { error: error.message }))
+      },
+      () => {
+        currentFlashSessionId.value = ''
+        onComplete()
+      }
+    )
+
+    webSocketTransfer.value.onTransferStarted = null
+  } catch (error) {
+    console.error('在线烧录失败:', error)
+    onError(t('flashProgress.onlineFlashFailed', { error: error.message }))
+  }
+}
+
 // 处理取消烧录
 const handleCancelFlash = () => {
+  if (isManagerMode() && currentFlashSessionId.value) {
+    cancelFlashSession(currentFlashSessionId.value).catch(error => {
+      console.warn('取消后端烧录任务失败:', error)
+    })
+    currentFlashSessionId.value = ''
+  }
   if (webSocketTransfer.value) {
     webSocketTransfer.value.cancel()
     webSocketTransfer.value.destroy()
