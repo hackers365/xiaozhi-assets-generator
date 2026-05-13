@@ -21,6 +21,7 @@ export const managerRequest = async (path, options = {}) => {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      'X-Console-Origin': window.location.origin,
       ...(options.headers || {}),
       Authorization: `Bearer ${token}`
     }
