@@ -11,6 +11,15 @@ export const getManagerToken = () => {
 
 export const isManagerMode = () => Boolean(getManagerDeviceId() && getManagerToken())
 
+const CAPABILITIES_CACHE_TTL = 5 * 60 * 1000
+const capabilitiesCache = new Map()
+
+const getCapabilitiesCacheKey = () => {
+  const deviceId = getManagerDeviceId()
+  const token = getManagerToken()
+  return `${deviceId || ''}:${token || ''}`
+}
+
 export const managerRequest = async (path, options = {}) => {
   const token = getManagerToken()
   if (!token) {
@@ -42,13 +51,26 @@ export const managerRequest = async (path, options = {}) => {
   return response.json()
 }
 
-export const getAssetsCapabilities = async () => {
+export const getAssetsCapabilities = async ({ force = false } = {}) => {
   const deviceId = getManagerDeviceId()
   if (!deviceId) {
     throw new Error('device_id not found')
   }
+  const cacheKey = getCapabilitiesCacheKey()
+  const cached = capabilitiesCache.get(cacheKey)
+  if (!force && cached && Date.now() < cached.expiresAt) {
+    return cached.data
+  }
+
   const result = await managerRequest(`/user/devices/${encodeURIComponent(deviceId)}/assets/capabilities`)
-  return result.data || result
+  const data = result.data || result
+  if (data.online) {
+    capabilitiesCache.set(cacheKey, {
+      data,
+      expiresAt: Date.now() + CAPABILITIES_CACHE_TTL
+    })
+  }
+  return data
 }
 
 export const createFlashSession = async ({ fileName = 'assets.bin', fileSize, sha256 = '', configSummary = {} }) => {

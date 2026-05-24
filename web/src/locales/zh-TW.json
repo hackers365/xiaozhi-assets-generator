@@ -57,6 +57,7 @@
     "downloadAssets": "下載 assets.bin",
     "flashToDevice": "線上燒錄到設備",
     "flashing": "正在燒錄到設備...",
+    "deviceDownloadProgress": "設備下載進度",
     "flashingCancel": "取消燒錄",
     "flashingError": "燒錄錯誤",
     "flashingInProgress": "燒錄中，請勿關閉視窗",
@@ -146,6 +147,8 @@
     "waitingForDeviceReboot": "等待設備重啟...",
     "deviceRebootTimeout": "等待設備重啟超時（60秒）",
     "startingFileTransfer": "開始檔案傳輸...",
+    "deviceDownloading": "設備已接收 {received} / {total}（{progress}%）",
+    "deviceDownloadCompleted": "設備已接收完整檔案（{total}）",
     "flashCompleted": "燒錄完成！",
     "onlineFlashFailed": "線上燒錄失敗: {error}"
   },

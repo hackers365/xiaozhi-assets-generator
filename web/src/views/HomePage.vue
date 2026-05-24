@@ -237,6 +237,13 @@ const callMcpTool = async (toolName, params = {}) => {
   return await callDeviceMcpTool(toolName, params)
 }
 
+const formatTransferBytes = (bytes) => {
+  const value = Number(bytes) || 0
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+  return `${(value / 1024 / 1024).toFixed(2)} MB`
+}
+
 // 处理开始在线烧录
 const handleStartFlash = async (flashData) => {
   if (isManagerMode()) {
@@ -366,7 +373,7 @@ const handleStartFlash = async (flashData) => {
 }
 
 const handleManagerStartFlash = async (flashData) => {
-  const { blob, onProgress, onComplete, onError } = flashData
+  const { blob, onProgress, onComplete, onError, onDeviceProgress } = flashData
 
   try {
     onProgress(5, t('flashProgress.checkingDeviceStatus'))
@@ -390,6 +397,28 @@ const handleManagerStartFlash = async (flashData) => {
     })
     currentFlashSessionId.value = session.session_id
     webSocketTransfer.value = new WebSocketTransfer(session.upload_ws_url)
+    let hasDeviceDownloadProgress = false
+
+    webSocketTransfer.value.onDeviceDownloadProgress = (message) => {
+      const bytesDownloaded = Number(message.bytesDownloaded ?? message.bytes_downloaded ?? 0)
+      const fileSize = Number(message.fileSize ?? message.file_size ?? blob.size)
+      const rawProgress = Number(message.progress)
+      const progress = Number.isFinite(rawProgress)
+        ? Math.max(0, Math.min(100, Math.round(rawProgress)))
+        : fileSize > 0
+          ? Math.max(0, Math.min(100, Math.round(bytesDownloaded / fileSize * 100)))
+          : 0
+      const text = t('flashProgress.deviceDownloading', {
+        progress,
+        received: formatTransferBytes(bytesDownloaded),
+        total: formatTransferBytes(fileSize)
+      })
+      hasDeviceDownloadProgress = true
+      if (onDeviceProgress) {
+        onDeviceProgress({ progress, text, bytesDownloaded, fileSize, status: message.status })
+      }
+      onProgress(60 + Math.round(progress * 0.4), text)
+    }
 
     let transferStartedResolver = null
     const transferStartedPromise = new Promise((resolve) => {
@@ -426,21 +455,44 @@ const handleManagerStartFlash = async (flashData) => {
     onProgress(60, t('flashProgress.startingFileTransfer'))
     await webSocketTransfer.value.startTransfer(
       (progress, step) => {
-        const adjustedProgress = 60 + (progress * 0.4)
-        onProgress(Math.round(adjustedProgress), step)
+        if (!hasDeviceDownloadProgress) {
+          const adjustedProgress = Math.min(65, 60 + Math.round(progress * 0.05))
+          onProgress(adjustedProgress, step)
+        }
       },
       (error) => {
         onError(t('flashProgress.onlineFlashFailed', { error: error.message }))
       },
       () => {
         currentFlashSessionId.value = ''
+        if (!hasDeviceDownloadProgress && onDeviceProgress) {
+          onDeviceProgress({
+            progress: 100,
+            text: t('flashProgress.deviceDownloadCompleted', { total: formatTransferBytes(blob.size) }),
+            bytesDownloaded: blob.size,
+            fileSize: blob.size,
+            status: 'delivered'
+          })
+        }
         onComplete()
       }
     )
 
     webSocketTransfer.value.onTransferStarted = null
+    webSocketTransfer.value.onDeviceDownloadProgress = null
   } catch (error) {
     console.error('在线烧录失败:', error)
+    if (currentFlashSessionId.value) {
+      const sessionId = currentFlashSessionId.value
+      currentFlashSessionId.value = ''
+      cancelFlashSession(sessionId).catch(cancelError => {
+        console.warn('清理后端烧录任务失败:', cancelError)
+      })
+    }
+    if (webSocketTransfer.value) {
+      webSocketTransfer.value.destroy()
+      webSocketTransfer.value = null
+    }
     onError(t('flashProgress.onlineFlashFailed', { error: error.message }))
   }
 }

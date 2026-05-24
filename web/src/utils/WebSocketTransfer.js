@@ -11,6 +11,7 @@ class WebSocketTransfer {
     this.onComplete = null
     this.onDownloadUrlReady = null
     this.onTransferStarted = null // 新增：transfer_started事件回调
+    this.onDeviceDownloadProgress = null
     this.currentSession = null
     this.totalBytesSent = 0 // 新增：总发送字节数跟踪
     this.isSendingChunk = false // 新增：标记是否正在发送数据块
@@ -92,6 +93,15 @@ class WebSocketTransfer {
               if (this.currentSession.transferReady) {
                 this.sendFileData()
               }
+            }
+            break
+
+          case 'device_download_progress':
+            if (this.currentSession) {
+              this.currentSession.bytesDownloaded = message.bytesDownloaded || 0
+            }
+            if (this.onDeviceDownloadProgress) {
+              this.onDeviceDownloadProgress(message)
             }
             break
 
@@ -428,6 +438,7 @@ class WebSocketTransfer {
     this.onComplete = null
     this.onDownloadUrlReady = null
     this.onTransferStarted = null
+    this.onDeviceDownloadProgress = null
     this.totalBytesSent = 0
     this.isSendingChunk = false
   }

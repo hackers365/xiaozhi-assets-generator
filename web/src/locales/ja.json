@@ -57,6 +57,7 @@
     "downloadAssets": "assets.binをダウンロード",
     "flashToDevice": "デバイスにオンライン書き込み",
     "flashing": "デバイスに書き込み中...",
+    "deviceDownloadProgress": "デバイスのダウンロード進捗",
     "flashingCancel": "書き込みをキャンセル",
     "flashingError": "書き込みエラー",
     "flashingInProgress": "書き込み中、ウィンドウを閉じないでください",
@@ -146,6 +147,8 @@
     "waitingForDeviceReboot": "デバイスの再起動を待機中...",
     "deviceRebootTimeout": "デバイスの再起動タイムアウト（60秒）",
     "startingFileTransfer": "ファイル転送を開始中...",
+    "deviceDownloading": "デバイス受信済み {received} / {total}（{progress}%）",
+    "deviceDownloadCompleted": "デバイスがファイル全体を受信しました（{total}）",
     "flashCompleted": "書き込み完了!",
     "onlineFlashFailed": "オンライン書き込みに失敗しました: {error}"
   },
