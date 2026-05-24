@@ -182,6 +182,20 @@
             </div>
           </div>
 
+          <div v-if="showDeviceDownloadProgress" class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+            <div class="flex items-center justify-between text-sm font-medium text-blue-900 mb-2">
+              <span>{{ $t('generateModal.deviceDownloadProgress') }}</span>
+              <span>{{ deviceDownloadProgress }}%</span>
+            </div>
+            <div class="bg-blue-100 rounded-full h-2 overflow-hidden">
+              <div
+                class="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out"
+                :style="{ width: deviceDownloadProgress + '%' }"
+              ></div>
+            </div>
+            <div class="text-xs text-blue-700 mt-2">{{ deviceDownloadText }}</div>
+          </div>
+
           <!-- 取消按钮 -->
           <button
             @click="cancelFlash"
@@ -231,6 +245,7 @@ import { ref, computed, onMounted, markRaw, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AssetsBuilder from '@/utils/AssetsBuilder.js'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { getAssetsCapabilities, isManagerMode } from '@/utils/ManagerApi.js'
 
 const { t } = useI18n()
 
@@ -244,7 +259,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'generate', 'startFlash', 'cancelFlash'])
 
 // 获取设备状态
-const { deviceInfo } = useDeviceStatus()
+const { deviceInfo, isDeviceOnline } = useDeviceStatus()
 
 const isGenerating = ref(false)
 const isCompleted = ref(false)
@@ -259,6 +274,9 @@ const isFlashing = ref(false)
 const flashProgress = ref(0)
 const flashCurrentStep = ref('')
 const flashError = ref('')
+const showDeviceDownloadProgress = ref(false)
+const deviceDownloadProgress = ref(0)
+const deviceDownloadText = ref('')
 
 
 // 使用计算属性来获取翻译后的进度步骤名称
@@ -654,6 +672,16 @@ const downloadFile = () => {
 // 检查设备在线状态
 const checkDeviceOnline = async () => {
   try {
+    if (isManagerMode()) {
+      if (isDeviceOnline.value && deviceInfo.value.assetsPartition?.size) {
+        deviceOnline.value = true
+        return
+      }
+      const capabilities = await getAssetsCapabilities()
+      deviceOnline.value = Boolean(capabilities.supports_flash)
+      return
+    }
+
     // 获取URL参数中的token
     const urlParams = new URLSearchParams(window.location.search)
     const token = urlParams.get('token')
@@ -707,6 +735,9 @@ const startOnlineFlash = async () => {
   flashProgress.value = 0
   flashCurrentStep.value = t('flashProgress.startingFileTransfer')
   flashError.value = ''
+  showDeviceDownloadProgress.value = false
+  deviceDownloadProgress.value = 0
+  deviceDownloadText.value = ''
 
   try {
     // 通知父组件开始在线烧录
@@ -720,11 +751,19 @@ const startOnlineFlash = async () => {
         isFlashing.value = false
         flashProgress.value = 100
         flashCurrentStep.value = t('flashProgress.flashCompleted')
+        if (showDeviceDownloadProgress.value) {
+          deviceDownloadProgress.value = 100
+        }
       },
       onError: (error) => {
         isFlashing.value = false
         flashError.value = error
         console.error(t('flashProgress.onlineFlashFailed', { error }))
+      },
+      onDeviceProgress: ({ progress, text }) => {
+        showDeviceDownloadProgress.value = true
+        deviceDownloadProgress.value = Math.max(0, Math.min(100, Math.round(progress || 0)))
+        deviceDownloadText.value = text || ''
       }
     })
   } catch (error) {

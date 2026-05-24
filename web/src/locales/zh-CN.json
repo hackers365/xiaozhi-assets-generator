@@ -57,6 +57,7 @@
     "downloadAssets": "下载 assets.bin",
     "flashToDevice": "在线烧录到设备",
     "flashing": "正在烧录到设备...",
+    "deviceDownloadProgress": "设备下载进度",
     "flashingCancel": "取消烧录",
     "flashingError": "烧录错误",
     "flashingInProgress": "烧录中，请勿关闭窗口",
@@ -104,6 +105,8 @@
     "waitingForDeviceReboot": "等待设备重启...",
     "deviceRebootTimeout": "等待设备重启超时（60秒）",
     "startingFileTransfer": "开始传输文件...",
+    "deviceDownloading": "设备已接收 {received} / {total}（{progress}%）",
+    "deviceDownloadCompleted": "设备已接收完整文件（{total}）",
     "flashCompleted": "烧录完成！",
     "onlineFlashFailed": "在线烧录失败: {error}"
   },

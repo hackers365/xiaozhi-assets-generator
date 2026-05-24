@@ -57,6 +57,7 @@
     "downloadAssets": "Download assets.bin",
     "flashToDevice": "Flash to Device Online",
     "flashing": "Flashing to device...",
+    "deviceDownloadProgress": "Device download progress",
     "flashingCancel": "Cancel Flash",
     "flashingError": "Flashing Error",
     "flashingInProgress": "Flashing in progress, please do not close the window",
@@ -146,6 +147,8 @@
     "waitingForDeviceReboot": "Waiting for device to reboot...",
     "deviceRebootTimeout": "Device reboot timeout (60 seconds)",
     "startingFileTransfer": "Starting file transfer...",
+    "deviceDownloading": "Device received {received} / {total} ({progress}%)",
+    "deviceDownloadCompleted": "Device received the full file ({total})",
     "flashCompleted": "Flashing completed!",
     "onlineFlashFailed": "Online flashing failed: {error}"
   },

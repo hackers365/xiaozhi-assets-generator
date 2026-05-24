@@ -57,6 +57,7 @@
     "downloadAssets": "Tải xuống assets.bin",
     "flashToDevice": "Flash trực tuyến vào thiết bị",
     "flashing": "Đang flash vào thiết bị...",
+    "deviceDownloadProgress": "Tiến độ tải xuống của thiết bị",
     "flashingCancel": "Hủy flash",
     "flashingError": "Lỗi flash",
     "flashingInProgress": "Đang flash, vui lòng không đóng cửa sổ",
@@ -146,6 +147,8 @@
     "waitingForDeviceReboot": "Đang chờ thiết bị khởi động lại...",
     "deviceRebootTimeout": "Hết thời gian chờ thiết bị khởi động lại (60 giây)",
     "startingFileTransfer": "Đang bắt đầu truyền tải tệp...",
+    "deviceDownloading": "Thiết bị đã nhận {received} / {total} ({progress}%)",
+    "deviceDownloadCompleted": "Thiết bị đã nhận toàn bộ tệp ({total})",
     "flashCompleted": "Flash hoàn thành!",
     "onlineFlashFailed": "Flash trực tuyến thất bại: {error}"
   },
